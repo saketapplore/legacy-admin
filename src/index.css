@@ -1,0 +1,191 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Better mobile scrolling */
+@media (max-width: 768px) {
+  html {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+}
+
+:root {
+  /* Color Theme from Legacy Mobile App */
+  --primary-color: #41b4be;
+  --primary-light: #6ecfd7;
+  --primary-dark: #2a8a93;
+  --gradient-primary: linear-gradient(135deg, #6ecfd7 0%, #41b4be 50%, #2a8a93 100%);
+  
+  --primary-bg: #F5F9FC;
+  --secondary-bg: #FFFFFF;
+  --card-bg: #FFFFFF;
+  --header-bg: #FFFFFF;
+  
+  /* Teal/Cyan for important cards */
+  --teal-primary: #41b4be;
+  --teal-secondary: #2a8a93;
+  --teal-light: #d1eef1;
+  
+  /* Blue accents */
+  --blue-primary: #41b4be;
+  --blue-light: #e3f5f7;
+  --blue-dark: #2a8a93;
+  
+  /* Text colors */
+  --text-primary: #1A2B3C;
+  --text-secondary: #666666;
+  --text-light: #888888;
+  --text-white: #FFFFFF;
+  
+  /* Status colors */
+  --success: #4CAF50;
+  --warning: #FFA726;
+  --error: #EF5350;
+  --info: #41b4be;
+  
+  /* Border and shadow */
+  --border-color: #E0E0E0;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+body {
+  font-family: 'Montserrat', sans-serif;
+  background: linear-gradient(135deg, #e8f5f7 0%, #d1eef1 50%, #c4e9ed 100%);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: 'Montserrat', sans-serif;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+input, textarea, select {
+  font-family: 'Montserrat', sans-serif;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(65, 180, 190, 0.2);
+}
+
+/* Utility Classes */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: var(--gradient-primary);
+  color: var(--text-white);
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(65, 180, 190, 0.4);
+}
+
+.btn-secondary {
+  background: var(--teal-secondary);
+  color: var(--text-white);
+}
+
+.btn-secondary:hover {
+  background: var(--teal-primary);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid var(--teal-primary);
+  color: var(--teal-primary);
+}
+
+.btn-outline:hover {
+  background: var(--gradient-primary);
+  color: var(--text-white);
+  border-color: transparent;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-success {
+  background: #E8F5E9;
+  color: var(--success);
+}
+
+.status-warning {
+  background: #FFF3E0;
+  color: var(--warning);
+}
+
+.status-error {
+  background: #FFEBEE;
+  color: var(--error);
+}
+
+.status-info {
+  background: #E1F5FE;
+  color: var(--info);
+}
+
