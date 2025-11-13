@@ -8,6 +8,9 @@ function UserManagement() {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
   
+  // Form Validation States
+  const [formErrors, setFormErrors] = useState({})
+  
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('')
   const [filterProject, setFilterProject] = useState('All Projects')
@@ -80,19 +83,109 @@ function UserManagement() {
     setTimeout(() => setNotification(null), 3000)
   }
 
+  // Validation Functions
+  const validateForm = (formData, isNewUser) => {
+    const errors = {}
+    
+    // Name Validation
+    const name = formData.get('name').trim()
+    if (!name) {
+      errors.name = 'Full name is required'
+    } else if (name.length < 3) {
+      errors.name = 'Name must be at least 3 characters long'
+    } else if (!/^[a-zA-Z\s]+$/.test(name)) {
+      errors.name = 'Name can only contain letters and spaces'
+    }
+    
+    // Email Validation
+    const email = formData.get('email').trim()
+    if (!email) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address'
+    } else {
+      // Check for duplicate email (only for new users or if email changed)
+      const isDuplicate = users.some(u => 
+        u.email.toLowerCase() === email.toLowerCase() && 
+        (!selectedUser || u.id !== selectedUser.id)
+      )
+      if (isDuplicate) {
+        errors.email = 'This email is already registered'
+      }
+    }
+    
+    // Phone Validation
+    const phone = formData.get('phone').trim()
+    if (!phone) {
+      errors.phone = 'Phone number is required'
+    } else if (!/^[6-9]\d{9}$/.test(phone)) {
+      errors.phone = 'Please enter a valid 10-digit Indian mobile number'
+    }
+    
+    // Project Validation
+    const project = formData.get('project')
+    if (!project || project === '') {
+      errors.project = 'Please select a project'
+    }
+    
+    // Property Validation
+    const property = formData.get('property').trim()
+    if (!property) {
+      errors.property = 'Property assignment is required'
+    } else if (property.length < 2) {
+      errors.property = 'Property must be at least 2 characters'
+    } else if (!/^[a-zA-Z0-9\s\-]+$/.test(property)) {
+      errors.property = 'Property can only contain letters, numbers, spaces, and hyphens'
+    }
+    
+    // Password Validation (only for new users)
+    if (isNewUser) {
+      const password = formData.get('password')
+      const confirmPassword = formData.get('confirmPassword')
+      
+      if (!password) {
+        errors.password = 'Password is required'
+      } else if (password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long'
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+        errors.password = 'Password must contain uppercase, lowercase, and number'
+      }
+      
+      if (!confirmPassword) {
+        errors.confirmPassword = 'Please confirm your password'
+      } else if (password !== confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match'
+      }
+    }
+    
+    return errors
+  }
+
   const handleSaveUser = (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
     
+    // Validate form
+    const errors = validateForm(formData, !selectedUser)
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      showNotification('Please fix the validation errors', 'error')
+      return
+    }
+    
+    // Clear errors if validation passes
+    setFormErrors({})
+    
     const userData = {
       id: selectedUser ? selectedUser.id : Date.now(),
-      name: formData.get('name'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
+      name: formData.get('name').trim(),
+      email: formData.get('email').trim(),
+      phone: formData.get('phone').trim(),
       status: formData.get('status'),
       project: formData.get('project'),
-      property: formData.get('property'),
-      address: formData.get('address'),
+      property: formData.get('property').trim(),
+      address: formData.get('address').trim(),
       paymentStatus: selectedUser ? selectedUser.paymentStatus : 'Up to Date',
       joinDate: selectedUser ? selectedUser.joinDate : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       documents: selectedUser ? selectedUser.documents : 0,
@@ -111,6 +204,7 @@ function UserManagement() {
 
     setShowUserModal(false)
     setSelectedUser(null)
+    setFormErrors({})
   }
 
   const handleDeleteUser = (userId) => {
@@ -818,7 +912,7 @@ This is a sample document for demonstration purposes.`
           <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedUser ? 'Edit User' : 'Create New User'}</h2>
-              <button className="close-btn" onClick={() => setShowUserModal(false)}>×</button>
+              <button className="close-btn" onClick={() => { setShowUserModal(false); setFormErrors({}); }}>×</button>
             </div>
             <div className="modal-body">
               <form className="user-form" onSubmit={handleSaveUser}>
@@ -830,8 +924,13 @@ This is a sample document for demonstration purposes.`
                       name="name"
                       placeholder="Enter full name" 
                       defaultValue={selectedUser?.name}
+                      minLength="3"
+                      pattern="[a-zA-Z\s]+"
+                      title="Name can only contain letters and spaces"
                       required 
+                      className={formErrors.name ? 'error' : ''}
                     />
+                    {formErrors.name && <span className="error-message">{formErrors.name}</span>}
                   </div>
                   <div className="form-group">
                     <label>Email *</label>
@@ -840,8 +939,12 @@ This is a sample document for demonstration purposes.`
                       name="email" 
                       placeholder="Enter email" 
                       defaultValue={selectedUser?.email}
+                      pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                      title="Please enter a valid email address"
                       required 
+                      className={formErrors.email ? 'error' : ''}
                     />
+                    {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>
                 </div>
 
@@ -853,8 +956,13 @@ This is a sample document for demonstration purposes.`
                       name="phone" 
                       placeholder="Enter phone number" 
                       defaultValue={selectedUser?.phone}
+                      pattern="[6-9][0-9]{9}"
+                      maxLength="10"
+                      title="Please enter a valid 10-digit Indian mobile number starting with 6-9"
                       required 
+                      className={formErrors.phone ? 'error' : ''}
                     />
+                    {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
                   </div>
                   <div className="form-group">
                     <label>Status</label>
@@ -875,12 +983,14 @@ This is a sample document for demonstration purposes.`
                       name="project"
                       defaultValue={selectedUser?.project || ''}
                       required
+                      className={formErrors.project ? 'error' : ''}
                     >
                       <option value="">Select Project</option>
                       <option>Legacy Heights</option>
                       <option>Legacy Gardens</option>
                       <option>Legacy Towers</option>
                     </select>
+                    {formErrors.project && <span className="error-message">{formErrors.project}</span>}
                   </div>
                   <div className="form-group">
                     <label>Assign Property *</label>
@@ -889,8 +999,13 @@ This is a sample document for demonstration purposes.`
                       name="property" 
                       placeholder="e.g., Flat A-1203" 
                       defaultValue={selectedUser?.property}
+                      pattern="[a-zA-Z0-9\s\-]+"
+                      minLength="2"
+                      title="Property can only contain letters, numbers, spaces, and hyphens"
                       required 
+                      className={formErrors.property ? 'error' : ''}
                     />
+                    {formErrors.property && <span className="error-message">{formErrors.property}</span>}
                   </div>
                 </div>
 
@@ -912,8 +1027,15 @@ This is a sample document for demonstration purposes.`
                         type="password"
                         name="password" 
                         placeholder="Enter password"
+                        minLength="8"
+                        title="Password must be at least 8 characters with uppercase, lowercase, and number"
                         required 
+                        className={formErrors.password ? 'error' : ''}
                       />
+                      {formErrors.password && <span className="error-message">{formErrors.password}</span>}
+                      <small style={{ fontSize: '11px', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
+                        Min 8 characters with uppercase, lowercase, and number
+                      </small>
                     </div>
                     <div className="form-group">
                       <label>Confirm Password *</label>
@@ -922,13 +1044,15 @@ This is a sample document for demonstration purposes.`
                         name="confirmPassword" 
                         placeholder="Confirm password"
                         required 
+                        className={formErrors.confirmPassword ? 'error' : ''}
                       />
+                      {formErrors.confirmPassword && <span className="error-message">{formErrors.confirmPassword}</span>}
                     </div>
                   </div>
                 )}
 
                 <div className="form-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowUserModal(false); setSelectedUser(null); }}>Cancel</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowUserModal(false); setSelectedUser(null); setFormErrors({}); }}>Cancel</button>
                   <button type="submit" className="btn btn-primary">
                     {selectedUser ? 'Update User' : 'Create User'}
                   </button>

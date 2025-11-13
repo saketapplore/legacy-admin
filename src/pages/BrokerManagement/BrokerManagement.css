@@ -260,6 +260,29 @@
   min-height: 120px;
 }
 
+/* Form Validation Error Styles */
+.broker-form .form-group input.error,
+.broker-form .form-group select.error,
+.broker-form .form-group textarea.error {
+  border-color: var(--error);
+  background-color: #FFEBEE;
+}
+
+.broker-form .form-group input.error:focus,
+.broker-form .form-group select.error:focus,
+.broker-form .form-group textarea.error:focus {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.2);
+}
+
+.broker-form .error-message {
+  color: var(--error);
+  font-size: 12px;
+  margin-top: -4px;
+  display: block;
+  font-weight: 500;
+}
+
 /* Mobile Card Styles */
 .broker-card-mobile {
   display: none;
