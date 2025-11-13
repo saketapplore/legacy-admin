@@ -12,6 +12,9 @@ function BrokerManagement() {
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
 
+  // Form Validation States
+  const [formErrors, setFormErrors] = useState({})
+
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState('All Status')
@@ -219,10 +222,10 @@ function BrokerManagement() {
     // Additional fields (if backend supports them, otherwise they'll be ignored)
     const additionalFields = {
       status: formData.get('status'),
-      commission: formData.get('commission'),
+      commission: formData.get('commission').trim(),
       performance: formData.get('performance'),
-      address: formData.get('address'),
-      notes: formData.get('notes'),
+      address: formData.get('address').trim(),
+      notes: formData.get('notes').trim(),
       clientsManaged: selectedBroker ? selectedBroker.clientsManaged : 0,
       bidsSubmitted: selectedBroker ? selectedBroker.bidsSubmitted : 0,
       successfulDeals: selectedBroker ? selectedBroker.successfulDeals : 0,
@@ -1160,7 +1163,7 @@ Date: ${new Date().toLocaleString()}`
           <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedBroker ? 'Edit Broker' : 'Create New Broker'}</h2>
-              <button className="close-btn" onClick={() => setShowBrokerModal(false)}>×</button>
+              <button className="close-btn" onClick={() => { setShowBrokerModal(false); setFormErrors({}); }}>×</button>
             </div>
             <div className="modal-body">
               <form className="broker-form" onSubmit={handleSaveBroker}>
@@ -1172,8 +1175,13 @@ Date: ${new Date().toLocaleString()}`
                       name="name"
                       placeholder="Enter full name" 
                       defaultValue={selectedBroker?.name}
+                      minLength="3"
+                      pattern="[a-zA-Z\s]+"
+                      title="Name can only contain letters and spaces"
                       required 
+                      className={formErrors.name ? 'error' : ''}
                     />
+                    {formErrors.name && <span className="error-message">{formErrors.name}</span>}
                   </div>
                   <div className="form-group">
                     <label>Email *</label>
@@ -1182,8 +1190,12 @@ Date: ${new Date().toLocaleString()}`
                       name="email" 
                       placeholder="Enter email" 
                       defaultValue={selectedBroker?.email}
+                      pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                      title="Please enter a valid email address"
                       required 
+                      className={formErrors.email ? 'error' : ''}
                     />
+                    {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>
                 </div>
 
@@ -1195,8 +1207,13 @@ Date: ${new Date().toLocaleString()}`
                       name="phone" 
                       placeholder="Enter phone number" 
                       defaultValue={selectedBroker?.phone}
+                      pattern="[6-9][0-9]{9}"
+                      maxLength="10"
+                      title="Please enter a valid 10-digit Indian mobile number starting with 6-9"
                       required 
+                      className={formErrors.phone ? 'error' : ''}
                     />
+                    {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
                   </div>
                   <div className="form-group">
                     <label>Status</label>
@@ -1239,7 +1256,11 @@ Date: ${new Date().toLocaleString()}`
                       name="commission" 
                       placeholder="e.g., 2.5%" 
                       defaultValue={selectedBroker?.commission}
+                      pattern="[0-9]+(\.[0-9]{1,2})?%?"
+                      title="Enter a valid commission rate (e.g., 2.5% or 2.5)"
+                      className={formErrors.commission ? 'error' : ''}
                     />
+                    {formErrors.commission && <span className="error-message">{formErrors.commission}</span>}
                   </div>
                   <div className="form-group">
                     <label>Performance Rating</label>
@@ -1283,8 +1304,15 @@ Date: ${new Date().toLocaleString()}`
                         type="password"
                         name="password" 
                         placeholder="Enter password"
+                        minLength="8"
+                        title="Password must be at least 8 characters with uppercase, lowercase, and number"
                         required 
+                        className={formErrors.password ? 'error' : ''}
                       />
+                      {formErrors.password && <span className="error-message">{formErrors.password}</span>}
+                      <small style={{ fontSize: '11px', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
+                        Min 8 characters with uppercase, lowercase, and number
+                      </small>
                     </div>
                     <div className="form-group">
                       <label>Confirm Password *</label>
@@ -1293,13 +1321,15 @@ Date: ${new Date().toLocaleString()}`
                         name="confirmPassword" 
                         placeholder="Confirm password"
                         required 
+                        className={formErrors.confirmPassword ? 'error' : ''}
                       />
+                      {formErrors.confirmPassword && <span className="error-message">{formErrors.confirmPassword}</span>}
                     </div>
                   </div>
                 )}
 
                 <div className="form-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowBrokerModal(false); setSelectedBroker(null); }}>Cancel</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowBrokerModal(false); setSelectedBroker(null); setFormErrors({}); }}>Cancel</button>
                   <button type="submit" className="btn btn-primary">
                     {selectedBroker ? 'Update Broker' : 'Create Broker'}
                   </button>

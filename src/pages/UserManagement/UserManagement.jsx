@@ -34,6 +34,9 @@ function UserManagement() {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
   
+  // Form Validation States
+  const [formErrors, setFormErrors] = useState({})
+  
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('')
   const [filterProject, setFilterProject] = useState('All Projects')
@@ -196,6 +199,18 @@ function UserManagement() {
   const handleSaveUser = async (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
+    
+    // Validate form
+    const errors = validateForm(formData, !selectedUser)
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      showNotification('Please fix the validation errors', 'error')
+      return
+    }
+    
+    // Clear errors if validation passes
+    setFormErrors({})
     
     try {
       const userData = {
@@ -1097,7 +1112,7 @@ This is a sample document for demonstration purposes.`
           <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedUser ? 'Edit User' : 'Create New User'}</h2>
-              <button className="close-btn" onClick={() => setShowUserModal(false)}>×</button>
+              <button className="close-btn" onClick={() => { setShowUserModal(false); setFormErrors({}); }}>×</button>
             </div>
             <div className="modal-body">
               <form className="user-form" onSubmit={handleSaveUser}>
@@ -1109,8 +1124,13 @@ This is a sample document for demonstration purposes.`
                       name="name"
                       placeholder="Enter full name" 
                       defaultValue={selectedUser?.name}
+                      minLength="3"
+                      pattern="[a-zA-Z\s]+"
+                      title="Name can only contain letters and spaces"
                       required 
+                      className={formErrors.name ? 'error' : ''}
                     />
+                    {formErrors.name && <span className="error-message">{formErrors.name}</span>}
                   </div>
                   <div className="form-group">
                     <label>Email *</label>
@@ -1119,8 +1139,12 @@ This is a sample document for demonstration purposes.`
                       name="email" 
                       placeholder="Enter email" 
                       defaultValue={selectedUser?.email}
+                      pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                      title="Please enter a valid email address"
                       required 
+                      className={formErrors.email ? 'error' : ''}
                     />
+                    {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>
                 </div>
 
@@ -1132,8 +1156,13 @@ This is a sample document for demonstration purposes.`
                       name="phone" 
                       placeholder="Enter phone number" 
                       defaultValue={selectedUser?.phone}
+                      pattern="[6-9][0-9]{9}"
+                      maxLength="10"
+                      title="Please enter a valid 10-digit Indian mobile number starting with 6-9"
                       required 
+                      className={formErrors.phone ? 'error' : ''}
                     />
+                    {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
                   </div>
                   <div className="form-group">
                     <label>Status</label>
@@ -1299,8 +1328,15 @@ This is a sample document for demonstration purposes.`
                         type="password"
                         name="password" 
                         placeholder="Enter password"
+                        minLength="8"
+                        title="Password must be at least 8 characters with uppercase, lowercase, and number"
                         required 
+                        className={formErrors.password ? 'error' : ''}
                       />
+                      {formErrors.password && <span className="error-message">{formErrors.password}</span>}
+                      <small style={{ fontSize: '11px', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
+                        Min 8 characters with uppercase, lowercase, and number
+                      </small>
                     </div>
                     <div className="form-group">
                       <label>Confirm Password *</label>
@@ -1309,13 +1345,15 @@ This is a sample document for demonstration purposes.`
                         name="confirmPassword" 
                         placeholder="Confirm password"
                         required 
+                        className={formErrors.confirmPassword ? 'error' : ''}
                       />
+                      {formErrors.confirmPassword && <span className="error-message">{formErrors.confirmPassword}</span>}
                     </div>
                   </div>
                 )}
 
                 <div className="form-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowUserModal(false); setSelectedUser(null); }}>Cancel</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowUserModal(false); setSelectedUser(null); setFormErrors({}); }}>Cancel</button>
                   <button type="submit" className="btn btn-primary">
                     {selectedUser ? 'Update User' : 'Create User'}
                   </button>

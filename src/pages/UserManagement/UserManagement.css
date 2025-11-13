@@ -646,6 +646,29 @@
   width: 100%;
 }
 
+/* Form Validation Error Styles */
+.form-group input.error,
+.form-group select.error,
+.form-group textarea.error {
+  border-color: var(--error);
+  background-color: #FFEBEE;
+}
+
+.form-group input.error:focus,
+.form-group select.error:focus,
+.form-group textarea.error:focus {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px rgba(239, 83, 80, 0.2);
+}
+
+.error-message {
+  color: var(--error);
+  font-size: 12px;
+  margin-top: -4px;
+  display: block;
+  font-weight: 500;
+}
+
 .form-actions {
   display: flex;
   gap: 12px;

@@ -6,7 +6,42 @@ function SupplierManagement() {
   const [selectedSupplier, setSelectedSupplier] = useState(null)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
+  const [showBrokerAssignmentModal, setShowBrokerAssignmentModal] = useState(false)
+  const [showPerformanceModal, setShowPerformanceModal] = useState(false)
+  const [showFulfillmentModal, setShowFulfillmentModal] = useState(false)
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false)
   const [notification, setNotification] = useState(null)
+
+  // Form Validation States
+  const [formErrors, setFormErrors] = useState({})
+
+  // Categories and Material Types Management
+  const [categories, setCategories] = useState(() => {
+    const savedCategories = localStorage.getItem('legacy-admin-supplier-categories')
+    return savedCategories ? JSON.parse(savedCategories) : [
+      'Building Materials',
+      'Cement & Concrete',
+      'Steel & Metal',
+      'Electrical',
+      'Plumbing',
+      'Paint & Coating',
+      'Hardware'
+    ]
+  })
+
+  const [materialTypes, setMaterialTypes] = useState(() => {
+    const savedMaterials = localStorage.getItem('legacy-admin-material-types')
+    return savedMaterials ? JSON.parse(savedMaterials) : [
+      'TMT Bars',
+      'Cement Bags',
+      'Sand',
+      'Aggregates',
+      'Paint',
+      'Pipes',
+      'Fittings',
+      'Wires & Cables'
+    ]
+  })
 
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('')
@@ -26,6 +61,24 @@ function SupplierManagement() {
     return savedDocs ? JSON.parse(savedDocs) : {}
   })
 
+  // Load brokers from Broker Management
+  const [availableBrokers, setAvailableBrokers] = useState(() => {
+    const savedBrokers = localStorage.getItem('legacy-admin-brokers')
+    return savedBrokers ? JSON.parse(savedBrokers) : []
+  })
+
+  // Store broker assignments for suppliers
+  const [supplierBrokerAssignments, setSupplierBrokerAssignments] = useState(() => {
+    const savedAssignments = localStorage.getItem('legacy-admin-supplier-broker-assignments')
+    return savedAssignments ? JSON.parse(savedAssignments) : {}
+  })
+
+  // Store supplier performance data
+  const [supplierPerformance, setSupplierPerformance] = useState(() => {
+    const savedPerformance = localStorage.getItem('legacy-admin-supplier-performance')
+    return savedPerformance ? JSON.parse(savedPerformance) : {}
+  })
+
   // Save to localStorage
   useEffect(() => {
     localStorage.setItem('legacy-admin-suppliers', JSON.stringify(suppliers))
@@ -34,6 +87,47 @@ function SupplierManagement() {
   useEffect(() => {
     localStorage.setItem('legacy-admin-supplier-documents', JSON.stringify(supplierDocuments))
   }, [supplierDocuments])
+
+  useEffect(() => {
+    localStorage.setItem('legacy-admin-supplier-broker-assignments', JSON.stringify(supplierBrokerAssignments))
+  }, [supplierBrokerAssignments])
+
+  useEffect(() => {
+    localStorage.setItem('legacy-admin-supplier-performance', JSON.stringify(supplierPerformance))
+  }, [supplierPerformance])
+
+  useEffect(() => {
+    localStorage.setItem('legacy-admin-supplier-categories', JSON.stringify(categories))
+  }, [categories])
+
+  useEffect(() => {
+    localStorage.setItem('legacy-admin-material-types', JSON.stringify(materialTypes))
+  }, [materialTypes])
+
+  // Listen for changes in Broker Management and update available brokers
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const savedBrokers = localStorage.getItem('legacy-admin-brokers')
+      if (savedBrokers) {
+        setAvailableBrokers(JSON.parse(savedBrokers))
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+
+    const interval = setInterval(() => {
+      const savedBrokers = localStorage.getItem('legacy-admin-brokers')
+      const currentBrokers = JSON.stringify(availableBrokers)
+      if (savedBrokers && savedBrokers !== currentBrokers) {
+        setAvailableBrokers(JSON.parse(savedBrokers))
+      }
+    }, 1000)
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      clearInterval(interval)
+    }
+  }, [availableBrokers])
 
   // Filtered Suppliers
   const filteredSuppliers = useMemo(() => {
@@ -65,22 +159,132 @@ function SupplierManagement() {
     setTimeout(() => setNotification(null), 3000)
   }
 
+  // Validation Functions
+  const validateSupplierForm = (formData, isNewSupplier) => {
+    const errors = {}
+    
+    // Company Name Validation
+    const companyName = formData.get('companyName').trim()
+    if (!companyName) {
+      errors.companyName = 'Company name is required'
+    } else if (companyName.length < 3) {
+      errors.companyName = 'Company name must be at least 3 characters long'
+    }
+    
+    // Contact Person Validation
+    const contactPerson = formData.get('contactPerson').trim()
+    if (!contactPerson) {
+      errors.contactPerson = 'Contact person is required'
+    } else if (contactPerson.length < 3) {
+      errors.contactPerson = 'Contact person name must be at least 3 characters long'
+    } else if (!/^[a-zA-Z\s]+$/.test(contactPerson)) {
+      errors.contactPerson = 'Contact person can only contain letters and spaces'
+    }
+    
+    // Email Validation
+    const email = formData.get('email').trim()
+    if (!email) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address'
+    } else {
+      // Check for duplicate email
+      const isDuplicate = suppliers.some(s => 
+        s.email.toLowerCase() === email.toLowerCase() && 
+        (!selectedSupplier || s.id !== selectedSupplier.id)
+      )
+      if (isDuplicate) {
+        errors.email = 'This email is already registered'
+      }
+    }
+    
+    // Phone Validation
+    const phone = formData.get('phone').trim()
+    if (!phone) {
+      errors.phone = 'Phone number is required'
+    } else if (!/^[6-9]\d{9}$/.test(phone)) {
+      errors.phone = 'Please enter a valid 10-digit Indian mobile number'
+    }
+    
+    // Category Validation
+    const category = formData.get('category')
+    if (!category || category === '') {
+      errors.category = 'Please select a category'
+    }
+    
+    // GST Number Validation
+    const gstNumber = formData.get('gstNumber').trim()
+    if (!gstNumber) {
+      errors.gstNumber = 'GST number is required'
+    } else if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstNumber)) {
+      errors.gstNumber = 'Please enter a valid GST number (e.g., 22AAAAA0000A1Z5)'
+    }
+    
+    // PAN Number Validation (optional but validate if provided)
+    const panNumber = formData.get('panNumber').trim()
+    if (panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panNumber)) {
+      errors.panNumber = 'Please enter a valid PAN number (e.g., AAAAA0000A)'
+    }
+    
+    // Location Validation
+    const location = formData.get('location').trim()
+    if (!location) {
+      errors.location = 'Location is required'
+    } else if (location.length < 2) {
+      errors.location = 'Location must be at least 2 characters'
+    }
+    
+    // Password Validation (only for new suppliers)
+    if (isNewSupplier) {
+      const password = formData.get('password')
+      const confirmPassword = formData.get('confirmPassword')
+      
+      if (!password) {
+        errors.password = 'Password is required'
+      } else if (password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long'
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+        errors.password = 'Password must contain uppercase, lowercase, and number'
+      }
+      
+      if (!confirmPassword) {
+        errors.confirmPassword = 'Please confirm your password'
+      } else if (password !== confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match'
+      }
+    }
+    
+    return errors
+  }
+
   const handleSaveSupplier = (e) => {
     e.preventDefault()
     const formData = new FormData(e.target)
     
+    // Validate form
+    const errors = validateSupplierForm(formData, !selectedSupplier)
+    
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors)
+      showNotification('Please fix the validation errors', 'error')
+      return
+    }
+    
+    // Clear errors if validation passes
+    setFormErrors({})
+    
     const supplierData = {
       id: selectedSupplier ? selectedSupplier.id : Date.now(),
-      companyName: formData.get('companyName'),
-      contactPerson: formData.get('contactPerson'),
-      email: formData.get('email'),
-      phone: formData.get('phone'),
+      companyName: formData.get('companyName').trim(),
+      contactPerson: formData.get('contactPerson').trim(),
+      email: formData.get('email').trim(),
+      phone: formData.get('phone').trim(),
       category: formData.get('category'),
       materialType: formData.get('materialType'),
-      gstNumber: formData.get('gstNumber'),
-      panNumber: formData.get('panNumber'),
-      location: formData.get('location'),
-      address: formData.get('address'),
+      gstNumber: formData.get('gstNumber').trim(),
+      panNumber: formData.get('panNumber').trim(),
+      location: formData.get('location').trim(),
+      address: formData.get('address').trim(),
       status: formData.get('status'),
       verificationStatus: selectedSupplier ? selectedSupplier.verificationStatus : 'Pending',
       joinDate: selectedSupplier ? selectedSupplier.joinDate : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -97,6 +301,7 @@ function SupplierManagement() {
 
     setShowSupplierModal(false)
     setSelectedSupplier(null)
+    setFormErrors({})
   }
 
   const handleViewDetails = (supplier) => {
@@ -213,13 +418,38 @@ function SupplierManagement() {
   }
 
   const handleVerifyDocument = (docId) => {
-    setSupplierDocuments(prev => ({
-      ...prev,
-      [selectedSupplier.id]: prev[selectedSupplier.id].map(doc =>
+    // Update document verified status
+    const updatedDocs = {
+      ...supplierDocuments,
+      [selectedSupplier.id]: supplierDocuments[selectedSupplier.id].map(doc =>
         doc.id === docId ? { ...doc, verified: true } : doc
       )
-    }))
-    showNotification('Document verified successfully!', 'success')
+    }
+    
+    setSupplierDocuments(updatedDocs)
+    
+    // Check if all documents are now verified
+    const allVerified = updatedDocs[selectedSupplier.id].every(doc => doc.verified)
+    
+    // If all documents are verified, update supplier verification status
+    if (allVerified && updatedDocs[selectedSupplier.id].length > 0) {
+      const updatedSupplier = {
+        ...selectedSupplier,
+        verificationStatus: 'Approved',
+        status: selectedSupplier.status === 'Inactive' ? 'Active' : selectedSupplier.status
+      }
+      
+      setSuppliers(suppliers.map(s => 
+        s.id === selectedSupplier.id ? updatedSupplier : s
+      ))
+      
+      // Update the selected supplier state to reflect changes in the modal
+      setSelectedSupplier(updatedSupplier)
+      
+      showNotification('All documents verified! Supplier approved.', 'success')
+    } else {
+      showNotification('Document verified successfully!', 'success')
+    }
   }
 
   const handleDownloadDocument = (documentData) => {
@@ -242,6 +472,134 @@ function SupplierManagement() {
     }
   }
 
+  // Broker Assignment Handlers
+  const handleManageBrokers = (supplier) => {
+    setSelectedSupplier(supplier)
+    setShowBrokerAssignmentModal(true)
+  }
+
+  const handleSaveBrokerAssignments = (e) => {
+    e.preventDefault()
+    
+    const brokerCheckboxes = document.querySelectorAll('input[name="brokers"]:checked')
+    const selectedBrokers = Array.from(brokerCheckboxes).map(cb => parseInt(cb.value))
+    
+    setSupplierBrokerAssignments(prev => ({
+      ...prev,
+      [selectedSupplier.id]: selectedBrokers
+    }))
+
+    showNotification(`Brokers assigned to ${selectedSupplier.companyName}!`, 'success')
+    setShowBrokerAssignmentModal(false)
+    setSelectedSupplier(null)
+  }
+
+  const getAssignedBrokers = (supplierId) => {
+    const assignments = supplierBrokerAssignments[supplierId]
+    if (!assignments) return []
+    return availableBrokers.filter(b => assignments.includes(b.id))
+  }
+
+  // Performance History Handlers
+  const handleViewPerformance = (supplier) => {
+    setSelectedSupplier(supplier)
+    setShowPerformanceModal(true)
+    
+    // Initialize performance data if not exists
+    if (!supplierPerformance[supplier.id]) {
+      setSupplierPerformance(prev => ({
+        ...prev,
+        [supplier.id]: {
+          totalBids: 0,
+          wonBids: 0,
+          lostBids: 0,
+          pendingBids: 0,
+          totalRevenue: 0,
+          averageBidValue: 0,
+          winRate: 0,
+          bidsHistory: []
+        }
+      }))
+    }
+  }
+
+  // Fulfillment Record Handlers
+  const handleViewFulfillment = (supplier) => {
+    setSelectedSupplier(supplier)
+    setShowFulfillmentModal(true)
+    
+    // Initialize fulfillment data if not exists
+    if (!supplierPerformance[supplier.id]?.fulfillment) {
+      setSupplierPerformance(prev => ({
+        ...prev,
+        [supplier.id]: {
+          ...prev[supplier.id],
+          fulfillment: {
+            totalOrders: 0,
+            completedOrders: 0,
+            onTimeDeliveries: 0,
+            lateDeliveries: 0,
+            cancelledOrders: 0,
+            deliverySuccessRate: 0,
+            onTimeRate: 0,
+            averageDeliveryTime: 0,
+            recentOrders: []
+          }
+        }
+      }))
+    }
+  }
+
+  // Reset Password Handler
+  const handleResetPassword = (supplier) => {
+    if (window.confirm(`Send password reset link to ${supplier.email}?`)) {
+      showNotification(`Password reset link sent to ${supplier.email}`, 'success')
+    }
+  }
+
+  // Categories Management Handlers
+  const handleAddCategory = (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const newCategory = formData.get('newCategory').trim()
+    
+    if (newCategory && !categories.includes(newCategory)) {
+      setCategories([...categories, newCategory])
+      showNotification(`Category "${newCategory}" added!`, 'success')
+      e.target.reset()
+    } else if (categories.includes(newCategory)) {
+      showNotification('Category already exists!', 'error')
+    }
+  }
+
+  const handleRemoveCategory = (category) => {
+    if (window.confirm(`Remove category "${category}"? Suppliers with this category will need to be updated.`)) {
+      setCategories(categories.filter(c => c !== category))
+      showNotification(`Category "${category}" removed!`, 'success')
+    }
+  }
+
+  const handleAddMaterialType = (e) => {
+    e.preventDefault()
+    const formData = new FormData(e.target)
+    const newMaterial = formData.get('newMaterial').trim()
+    
+    if (newMaterial && !materialTypes.includes(newMaterial)) {
+      setMaterialTypes([...materialTypes, newMaterial])
+      showNotification(`Material type "${newMaterial}" added!`, 'success')
+      e.target.reset()
+    } else if (materialTypes.includes(newMaterial)) {
+      showNotification('Material type already exists!', 'error')
+    }
+  }
+
+  const handleRemoveMaterialType = (material) => {
+    if (window.confirm(`Remove material type "${material}"?`)) {
+      setMaterialTypes(materialTypes.filter(m => m !== material))
+      showNotification(`Material type "${material}" removed!`, 'success')
+    }
+  }
+
   return (
     <div className="supplier-management-page">
       <div className="page-header">
@@ -249,9 +607,14 @@ function SupplierManagement() {
           <h1 className="page-title-main">Supplier Management</h1>
           <p className="page-subtitle">Manage supplier accounts, verify documents, and approve onboarding</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setSelectedSupplier(null); setShowSupplierModal(true); }}>
-          + Create New Supplier
-        </button>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <button className="btn btn-outline" onClick={() => setShowCategoriesModal(true)}>
+            🏷️ Manage Categories
+          </button>
+          <button className="btn btn-primary" onClick={() => { setSelectedSupplier(null); setShowSupplierModal(true); }}>
+            + Create New Supplier
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -306,13 +669,9 @@ function SupplierManagement() {
             onChange={(e) => setFilterCategory(e.target.value)}
           >
             <option>All Categories</option>
-            <option>Building Materials</option>
-            <option>Cement & Concrete</option>
-            <option>Steel & Metal</option>
-            <option>Electrical</option>
-            <option>Plumbing</option>
-            <option>Paint</option>
-            <option>Hardware</option>
+            {categories.map((cat, index) => (
+              <option key={index}>{cat}</option>
+            ))}
           </select>
           <select 
             className="filter-select"
@@ -331,7 +690,7 @@ function SupplierManagement() {
             <option>Verification Status</option>
             <option>Approved</option>
             <option>Pending</option>
-            <option>Rejected</option>
+            {/* <option>Rejected</option> */}
           </select>
           <button className="btn btn-outline clear-filters-btn" onClick={handleClearFilters}>
             Clear
@@ -415,6 +774,10 @@ function SupplierManagement() {
                     <button className="action-btn" title={supplier.status === 'Active' ? 'Deactivate' : 'Activate'} onClick={() => supplier.status === 'Active' ? handleDeactivateSupplier(supplier.id) : handleActivateSupplier(supplier.id)}>
                       {supplier.status === 'Active' ? '⏸️' : '▶️'}
                     </button>
+                    <button className="action-btn" title="Assign Brokers" onClick={() => handleManageBrokers(supplier)}>🤝</button>
+                    <button className="action-btn" title="Performance History" onClick={() => handleViewPerformance(supplier)}>📊</button>
+                    <button className="action-btn" title="Fulfillment Record" onClick={() => handleViewFulfillment(supplier)}>🚚</button>
+                    <button className="action-btn" title="Reset Password" onClick={() => handleResetPassword(supplier)}>🔑</button>
                     <button className="action-btn" title="Documents" onClick={() => handleManageDocuments(supplier)}>📄</button>
                     <button className="action-btn" title="Delete" onClick={() => handleDeleteSupplier(supplier.id)}>🗑️</button>
                   </div>
@@ -508,6 +871,16 @@ function SupplierManagement() {
               )}
               <button className="btn btn-outline" onClick={() => handleManageDocuments(supplier)}>📄 Documents</button>
             </div>
+            
+            <div className="supplier-card-actions" style={{ marginTop: '8px' }}>
+              <button className="btn btn-outline" onClick={() => handleManageBrokers(supplier)}>🤝 Brokers</button>
+              <button className="btn btn-outline" onClick={() => handleViewPerformance(supplier)}>📊 Performance</button>
+            </div>
+            
+            <div className="supplier-card-actions" style={{ marginTop: '8px' }}>
+              <button className="btn btn-outline" onClick={() => handleViewFulfillment(supplier)}>🚚 Fulfillment</button>
+              <button className="btn btn-outline" onClick={() => handleResetPassword(supplier)}>🔑 Reset Password</button>
+            </div>
           </div>
           ))
         )}
@@ -589,6 +962,23 @@ function SupplierManagement() {
                 </div>
               )}
 
+              {/* Assigned Brokers Section */}
+              <div className="details-section">
+                <h4>Assigned Brokers ({getAssignedBrokers(selectedSupplier.id).length})</h4>
+                {getAssignedBrokers(selectedSupplier.id).length > 0 ? (
+                  <div className="assignments-list">
+                    {getAssignedBrokers(selectedSupplier.id).map(broker => (
+                      <div key={broker.id} className="assignment-item">
+                        <span>🤝 {broker.name}</span>
+                        <span className="assignment-meta">{broker.email} - {broker.phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="no-assignments">No brokers assigned yet</p>
+                )}
+              </div>
+
               <div className="account-actions-section">
                 <h4>Supplier Actions</h4>
                 <div className="account-actions-grid">
@@ -611,6 +1001,18 @@ function SupplierManagement() {
                       ▶️ Activate
                     </button>
                   )}
+                  <button className="btn btn-outline" onClick={() => { setShowDetailsModal(false); handleManageBrokers(selectedSupplier); }}>
+                    🤝 Assign Brokers
+                  </button>
+                  <button className="btn btn-outline" onClick={() => { setShowDetailsModal(false); handleViewPerformance(selectedSupplier); }}>
+                    📊 View Performance
+                  </button>
+                  <button className="btn btn-outline" onClick={() => { setShowDetailsModal(false); handleViewFulfillment(selectedSupplier); }}>
+                    🚚 Fulfillment Record
+                  </button>
+                  <button className="btn btn-outline" onClick={() => { setShowDetailsModal(false); handleResetPassword(selectedSupplier); }}>
+                    🔑 Reset Password
+                  </button>
                   <button className="btn btn-outline" onClick={() => { setShowDetailsModal(false); handleManageDocuments(selectedSupplier); }}>
                     📄 Verify Documents
                   </button>
@@ -632,67 +1034,148 @@ function SupplierManagement() {
           <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedSupplier ? 'Edit Supplier' : 'Create New Supplier'}</h2>
-              <button className="close-btn" onClick={() => setShowSupplierModal(false)}>×</button>
+              <button className="close-btn" onClick={() => { setShowSupplierModal(false); setFormErrors({}); }}>×</button>
             </div>
             <div className="modal-body">
               <form className="supplier-form" onSubmit={handleSaveSupplier}>
                 <div className="form-row">
                   <div className="form-group">
                     <label>Company Name *</label>
-                    <input type="text" name="companyName" placeholder="Company name" defaultValue={selectedSupplier?.companyName} required />
+                    <input 
+                      type="text" 
+                      name="companyName" 
+                      placeholder="Company name" 
+                      defaultValue={selectedSupplier?.companyName}
+                      minLength="3"
+                      required 
+                      className={formErrors.companyName ? 'error' : ''}
+                    />
+                    {formErrors.companyName && <span className="error-message">{formErrors.companyName}</span>}
                   </div>
                   <div className="form-group">
                     <label>Contact Person *</label>
-                    <input type="text" name="contactPerson" placeholder="Contact person" defaultValue={selectedSupplier?.contactPerson} required />
+                    <input 
+                      type="text" 
+                      name="contactPerson" 
+                      placeholder="Contact person" 
+                      defaultValue={selectedSupplier?.contactPerson}
+                      minLength="3"
+                      pattern="[a-zA-Z\s]+"
+                      title="Contact person can only contain letters and spaces"
+                      required 
+                      className={formErrors.contactPerson ? 'error' : ''}
+                    />
+                    {formErrors.contactPerson && <span className="error-message">{formErrors.contactPerson}</span>}
                   </div>
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
                     <label>Email *</label>
-                    <input type="email" name="email" placeholder="company@example.com" defaultValue={selectedSupplier?.email} required />
+                    <input 
+                      type="email" 
+                      name="email" 
+                      placeholder="company@example.com" 
+                      defaultValue={selectedSupplier?.email}
+                      pattern="[^\s@]+@[^\s@]+\.[^\s@]+"
+                      title="Please enter a valid email address"
+                      required 
+                      className={formErrors.email ? 'error' : ''}
+                    />
+                    {formErrors.email && <span className="error-message">{formErrors.email}</span>}
                   </div>
                   <div className="form-group">
                     <label>Phone *</label>
-                    <input type="tel" name="phone" placeholder="Phone number" defaultValue={selectedSupplier?.phone} required />
+                    <input 
+                      type="tel" 
+                      name="phone" 
+                      placeholder="Phone number" 
+                      defaultValue={selectedSupplier?.phone}
+                      pattern="[6-9][0-9]{9}"
+                      maxLength="10"
+                      title="Please enter a valid 10-digit Indian mobile number starting with 6-9"
+                      required 
+                      className={formErrors.phone ? 'error' : ''}
+                    />
+                    {formErrors.phone && <span className="error-message">{formErrors.phone}</span>}
                   </div>
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
                     <label>Category *</label>
-                    <select name="category" defaultValue={selectedSupplier?.category || ''} required>
+                    <select 
+                      name="category" 
+                      defaultValue={selectedSupplier?.category || ''} 
+                      required
+                      className={formErrors.category ? 'error' : ''}
+                    >
                       <option value="">Select Category</option>
-                      <option>Building Materials</option>
-                      <option>Cement & Concrete</option>
-                      <option>Steel & Metal</option>
-                      <option>Electrical</option>
-                      <option>Plumbing</option>
-                      <option>Paint</option>
-                      <option>Hardware</option>
+                      {categories.map((cat, index) => (
+                        <option key={index} value={cat}>{cat}</option>
+                      ))}
                     </select>
+                    {formErrors.category && <span className="error-message">{formErrors.category}</span>}
                   </div>
                   <div className="form-group">
                     <label>Material Type</label>
-                    <input type="text" name="materialType" placeholder="e.g., TMT Bars" defaultValue={selectedSupplier?.materialType} />
+                    <select name="materialType" defaultValue={selectedSupplier?.materialType || ''}>
+                      <option value="">Select Material Type</option>
+                      {materialTypes.map((material, index) => (
+                        <option key={index} value={material}>{material}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
                     <label>GST Number *</label>
-                    <input type="text" name="gstNumber" placeholder="22AAAAA0000A1Z5" defaultValue={selectedSupplier?.gstNumber} required />
+                    <input 
+                      type="text" 
+                      name="gstNumber" 
+                      placeholder="22AAAAA0000A1Z5" 
+                      defaultValue={selectedSupplier?.gstNumber}
+                      pattern="[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}"
+                      maxLength="15"
+                      title="Please enter a valid 15-character GST number"
+                      required 
+                      className={formErrors.gstNumber ? 'error' : ''}
+                    />
+                    {formErrors.gstNumber && <span className="error-message">{formErrors.gstNumber}</span>}
+                    <small style={{ fontSize: '11px', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
+                      Format: 22AAAAA0000A1Z5 (15 characters)
+                    </small>
                   </div>
                   <div className="form-group">
                     <label>PAN Number</label>
-                    <input type="text" name="panNumber" placeholder="AAAAA0000A" defaultValue={selectedSupplier?.panNumber} />
+                    <input 
+                      type="text" 
+                      name="panNumber" 
+                      placeholder="AAAAA0000A" 
+                      defaultValue={selectedSupplier?.panNumber}
+                      pattern="[A-Z]{5}[0-9]{4}[A-Z]{1}"
+                      maxLength="10"
+                      title="Please enter a valid 10-character PAN number"
+                      className={formErrors.panNumber ? 'error' : ''}
+                    />
+                    {formErrors.panNumber && <span className="error-message">{formErrors.panNumber}</span>}
                   </div>
                 </div>
 
                 <div className="form-row">
                   <div className="form-group">
                     <label>Location *</label>
-                    <input type="text" name="location" placeholder="City, State" defaultValue={selectedSupplier?.location} required />
+                    <input 
+                      type="text" 
+                      name="location" 
+                      placeholder="City, State" 
+                      defaultValue={selectedSupplier?.location}
+                      minLength="2"
+                      required 
+                      className={formErrors.location ? 'error' : ''}
+                    />
+                    {formErrors.location && <span className="error-message">{formErrors.location}</span>}
                   </div>
                   <div className="form-group">
                     <label>Status</label>
@@ -712,17 +1195,36 @@ function SupplierManagement() {
                   <div className="form-row">
                     <div className="form-group">
                       <label>Password *</label>
-                      <input type="password" name="password" placeholder="Password" required />
+                      <input 
+                        type="password" 
+                        name="password" 
+                        placeholder="Password"
+                        minLength="8"
+                        title="Password must be at least 8 characters with uppercase, lowercase, and number"
+                        required 
+                        className={formErrors.password ? 'error' : ''}
+                      />
+                      {formErrors.password && <span className="error-message">{formErrors.password}</span>}
+                      <small style={{ fontSize: '11px', color: 'var(--text-light)', marginTop: '4px', display: 'block' }}>
+                        Min 8 characters with uppercase, lowercase, and number
+                      </small>
                     </div>
                     <div className="form-group">
                       <label>Confirm Password *</label>
-                      <input type="password" name="confirmPassword" placeholder="Confirm password" required />
+                      <input 
+                        type="password" 
+                        name="confirmPassword" 
+                        placeholder="Confirm password"
+                        required 
+                        className={formErrors.confirmPassword ? 'error' : ''}
+                      />
+                      {formErrors.confirmPassword && <span className="error-message">{formErrors.confirmPassword}</span>}
                     </div>
                   </div>
                 )}
 
                 <div className="form-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowSupplierModal(false); setSelectedSupplier(null); }}>Cancel</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { setShowSupplierModal(false); setSelectedSupplier(null); setFormErrors({}); }}>Cancel</button>
                   <button type="submit" className="btn btn-primary">{selectedSupplier ? 'Update' : 'Create'}</button>
                 </div>
               </form>
@@ -801,6 +1303,346 @@ function SupplierManagement() {
         </div>
       )}
 
+      {/* Broker Assignment Modal */}
+      {showBrokerAssignmentModal && selectedSupplier && (
+        <div className="modal-overlay" onClick={() => setShowBrokerAssignmentModal(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Assign Brokers - {selectedSupplier.companyName}</h2>
+              <button className="close-btn" onClick={() => setShowBrokerAssignmentModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="documents-summary">
+                <p className="summary-text">
+                  Supplier: <strong>{selectedSupplier.companyName}</strong>
+                </p>
+                <p className="summary-text">
+                  Current Assignments: <strong>{getAssignedBrokers(selectedSupplier.id).length} Brokers</strong>
+                </p>
+                {availableBrokers.length > 0 && (
+                  <p className="summary-text" style={{ fontSize: '12px', fontStyle: 'italic' }}>
+                    💡 Brokers synced from Broker Management
+                  </p>
+                )}
+              </div>
+
+              <form className="assignment-form" onSubmit={handleSaveBrokerAssignments}>
+                <div className="assignment-section">
+                  <h3 className="section-title">Assign Brokers ({availableBrokers.length} available)</h3>
+                  {availableBrokers.length > 0 ? (
+                    <div className="assignment-checkboxes">
+                      {availableBrokers.map(broker => (
+                        <label key={broker.id} className="assignment-checkbox-label">
+                          <input 
+                            type="checkbox" 
+                            name="brokers"
+                            value={broker.id}
+                            defaultChecked={supplierBrokerAssignments[selectedSupplier.id]?.includes(broker.id)}
+                          />
+                          <div className="assignment-info">
+                            <span className="assignment-name">🤝 {broker.name}</span>
+                            <span className="assignment-details">{broker.email} - {broker.phone}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="no-buyers-available">
+                      <p>No brokers available. Please create brokers in Broker Management first.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => setShowBrokerAssignmentModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary">Save Assignments</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Performance History Modal */}
+      {showPerformanceModal && selectedSupplier && (
+        <div className="modal-overlay" onClick={() => setShowPerformanceModal(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Performance History - {selectedSupplier.companyName}</h2>
+              <button className="close-btn" onClick={() => setShowPerformanceModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="documents-summary">
+                <p className="summary-text">
+                  Supplier: <strong>{selectedSupplier.companyName}</strong>
+                </p>
+                <p className="summary-text">
+                  Status: <strong>{selectedSupplier.verificationStatus}</strong>
+                </p>
+              </div>
+
+              <h3 className="section-title">Bidding Performance</h3>
+              <div className="details-grid">
+                <div className="detail-item">
+                  <label>Total Bids</label>
+                  <p className="stat-value-sm">{supplierPerformance[selectedSupplier.id]?.totalBids || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Won Bids</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--success)' }}>{supplierPerformance[selectedSupplier.id]?.wonBids || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Lost Bids</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--error)' }}>{supplierPerformance[selectedSupplier.id]?.lostBids || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Pending Bids</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--warning)' }}>{supplierPerformance[selectedSupplier.id]?.pendingBids || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Win Rate</label>
+                  <p className="stat-value-sm">{supplierPerformance[selectedSupplier.id]?.winRate || 0}%</p>
+                </div>
+                <div className="detail-item">
+                  <label>Total Revenue</label>
+                  <p className="stat-value-sm">₹{(supplierPerformance[selectedSupplier.id]?.totalRevenue || 0).toLocaleString()}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Average Bid Value</label>
+                  <p className="stat-value-sm">₹{(supplierPerformance[selectedSupplier.id]?.averageBidValue || 0).toLocaleString()}</p>
+                </div>
+              </div>
+
+              <h3 className="section-title" style={{ marginTop: '30px' }}>Recent Bids</h3>
+              <div className="documents-list">
+                {supplierPerformance[selectedSupplier.id]?.bidsHistory?.length > 0 ? (
+                  supplierPerformance[selectedSupplier.id].bidsHistory.map((bid, index) => (
+                    <div key={index} className="document-item">
+                      <div className="document-icon">{bid.status === 'Won' ? '✅' : bid.status === 'Lost' ? '❌' : '⏳'}</div>
+                      <div className="document-info">
+                        <div className="document-name">{bid.projectName}</div>
+                        <div className="document-meta">{bid.date} • ₹{bid.amount.toLocaleString()}</div>
+                      </div>
+                      <span className={`status-badge ${
+                        bid.status === 'Won' ? 'status-success' : 
+                        bid.status === 'Lost' ? 'status-error' : 
+                        'status-warning'
+                      }`}>
+                        {bid.status}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-documents">No bidding history available yet.</p>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setShowPerformanceModal(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fulfillment Record Modal */}
+      {showFulfillmentModal && selectedSupplier && (
+        <div className="modal-overlay" onClick={() => setShowFulfillmentModal(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Fulfillment Record - {selectedSupplier.companyName}</h2>
+              <button className="close-btn" onClick={() => setShowFulfillmentModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="documents-summary">
+                <p className="summary-text">
+                  Supplier: <strong>{selectedSupplier.companyName}</strong>
+                </p>
+                <p className="summary-text">
+                  Category: <strong>{selectedSupplier.category}</strong>
+                </p>
+              </div>
+
+              <h3 className="section-title">Delivery Performance</h3>
+              <div className="details-grid">
+                <div className="detail-item">
+                  <label>Total Orders</label>
+                  <p className="stat-value-sm">{supplierPerformance[selectedSupplier.id]?.fulfillment?.totalOrders || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Completed Orders</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--success)' }}>{supplierPerformance[selectedSupplier.id]?.fulfillment?.completedOrders || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>On-Time Deliveries</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--success)' }}>{supplierPerformance[selectedSupplier.id]?.fulfillment?.onTimeDeliveries || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Late Deliveries</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--warning)' }}>{supplierPerformance[selectedSupplier.id]?.fulfillment?.lateDeliveries || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Cancelled Orders</label>
+                  <p className="stat-value-sm" style={{ color: 'var(--error)' }}>{supplierPerformance[selectedSupplier.id]?.fulfillment?.cancelledOrders || 0}</p>
+                </div>
+                <div className="detail-item">
+                  <label>Success Rate</label>
+                  <p className="stat-value-sm">{supplierPerformance[selectedSupplier.id]?.fulfillment?.deliverySuccessRate || 0}%</p>
+                </div>
+                <div className="detail-item">
+                  <label>On-Time Rate</label>
+                  <p className="stat-value-sm">{supplierPerformance[selectedSupplier.id]?.fulfillment?.onTimeRate || 0}%</p>
+                </div>
+                <div className="detail-item">
+                  <label>Avg. Delivery Time</label>
+                  <p className="stat-value-sm">{supplierPerformance[selectedSupplier.id]?.fulfillment?.averageDeliveryTime || 0} days</p>
+                </div>
+              </div>
+
+              <h3 className="section-title" style={{ marginTop: '30px' }}>Recent Orders</h3>
+              <div className="documents-list">
+                {supplierPerformance[selectedSupplier.id]?.fulfillment?.recentOrders?.length > 0 ? (
+                  supplierPerformance[selectedSupplier.id].fulfillment.recentOrders.map((order, index) => (
+                    <div key={index} className="document-item">
+                      <div className="document-icon">
+                        {order.status === 'Delivered' ? '🚚' : order.status === 'Cancelled' ? '❌' : '⏳'}
+                      </div>
+                      <div className="document-info">
+                        <div className="document-name">Order #{order.orderId}</div>
+                        <div className="document-meta">
+                          {order.orderDate} • Delivered: {order.deliveryDate || 'Pending'} • {order.deliveryTime} days
+                        </div>
+                      </div>
+                      <span className={`status-badge ${
+                        order.status === 'Delivered' && order.onTime ? 'status-success' : 
+                        order.status === 'Delivered' && !order.onTime ? 'status-warning' :
+                        order.status === 'Cancelled' ? 'status-error' : 
+                        'status-info'
+                      }`}>
+                        {order.status} {order.onTime !== undefined && (order.onTime ? '✓' : '⚠️')}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-documents">No order history available yet.</p>
+                )}
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-outline" onClick={() => setShowFulfillmentModal(false)}>Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Categories Management Modal */}
+      {showCategoriesModal && (
+        <div className="modal-overlay" onClick={() => setShowCategoriesModal(false)}>
+          <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Manage Categories & Material Types</h2>
+              <button className="close-btn" onClick={() => setShowCategoriesModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="documents-summary">
+                <p className="summary-text">
+                  Manage supplier categories and material types for the entire system
+                </p>
+              </div>
+
+              {/* Categories Section */}
+              <div className="assignment-section">
+                <h3 className="section-title">Supplier Categories ({categories.length})</h3>
+                
+                <form onSubmit={handleAddCategory} style={{ marginBottom: '20px' }}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Add New Category</label>
+                      <input 
+                        type="text" 
+                        name="newCategory"
+                        placeholder="e.g., Wood & Timber"
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-end', marginTop: '28px' }}>
+                      Add Category
+                    </button>
+                  </div>
+                </form>
+
+                <div className="documents-list">
+                  {categories.map((category, index) => (
+                    <div key={index} className="document-item">
+                      <div className="document-icon">🏷️</div>
+                      <div className="document-info">
+                        <div className="document-name">{category}</div>
+                        <div className="document-meta">Category #{index + 1}</div>
+                      </div>
+                      <button 
+                        className="action-btn" 
+                        title="Remove Category"
+                        onClick={() => handleRemoveCategory(category)}
+                        style={{ padding: '8px 12px', background: 'var(--error)', color: 'white', borderRadius: '6px' }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Material Types Section */}
+              <div className="assignment-section" style={{ marginTop: '30px' }}>
+                <h3 className="section-title">Material Types ({materialTypes.length})</h3>
+                
+                <form onSubmit={handleAddMaterialType} style={{ marginBottom: '20px' }}>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Add New Material Type</label>
+                      <input 
+                        type="text" 
+                        name="newMaterial"
+                        placeholder="e.g., Ceramic Tiles"
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="btn btn-primary" style={{ alignSelf: 'flex-end', marginTop: '28px' }}>
+                      Add Material
+                    </button>
+                  </div>
+                </form>
+
+                <div className="documents-list">
+                  {materialTypes.map((material, index) => (
+                    <div key={index} className="document-item">
+                      <div className="document-icon">📦</div>
+                      <div className="document-info">
+                        <div className="document-name">{material}</div>
+                        <div className="document-meta">Material Type #{index + 1}</div>
+                      </div>
+                      <button 
+                        className="action-btn" 
+                        title="Remove Material Type"
+                        onClick={() => handleRemoveMaterialType(material)}
+                        style={{ padding: '8px 12px', background: 'var(--error)', color: 'white', borderRadius: '6px' }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="modal-actions">
+                <button className="btn btn-primary" onClick={() => setShowCategoriesModal(false)}>Done</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notification Toast */}
       {notification && (
         <div className={`notification-toast ${notification.type}`}>
@@ -812,4 +1654,5 @@ function SupplierManagement() {
 }
 
 export default SupplierManagement
+
 
