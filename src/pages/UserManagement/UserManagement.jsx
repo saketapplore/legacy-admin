@@ -21,7 +21,8 @@ import {
   DollarSign,
   MapPin,
   Check,
-  Mail
+  Mail,
+  MoreVertical
 } from 'lucide-react'
 
 // API Base URL
@@ -33,6 +34,7 @@ function UserManagement() {
   const [showDetailsModal, setShowDetailsModal] = useState(false)
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState(null)
   
   // Form Validation States
   const [formErrors, setFormErrors] = useState({})
@@ -152,6 +154,22 @@ function UserManagement() {
   useEffect(() => {
     localStorage.setItem('legacy-admin-documents', JSON.stringify(userDocuments))
   }, [userDocuments])
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openMenuId && !event.target.closest('.action-menu-container')) {
+        setOpenMenuId(null)
+      }
+    }
+
+    if (openMenuId) {
+      document.addEventListener('click', handleClickOutside)
+      return () => {
+        document.removeEventListener('click', handleClickOutside)
+      }
+    }
+  }, [openMenuId])
 
   // Filtered and Searched Users
   const filteredUsers = useMemo(() => {
@@ -798,56 +816,91 @@ This is a sample document for demonstration purposes.`
                   <span className="tickets-count">{user.tickets}</span>
                 </td>
                 <td>
-                  <div className="action-buttons">
+                  <div className="action-menu-container">
                     <button 
-                      className="action-btn-um" 
-                      title="View Details"
-                      onClick={() => handleViewDetails(user)}
+                      className="action-menu-btn" 
+                      title="Actions"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenMenuId(openMenuId === user.id ? null : user.id)
+                      }}
                     >
-                      View
+                      <MoreVertical size={18} />
                     </button>
-                    <button 
-                      className="action-btn-um" 
-                      title="Edit User"
-                      onClick={() => handleEditUser(user)}
-                    >
-                      Edit
-                    </button>
-                    <button 
-                      className="action-btn-um" 
-                      title={user.status === 'Active' ? 'Deactivate Account' : 'Activate Account'}
-                      onClick={() => handleToggleStatus(user.id, user.status)}
-                    >
-                      {user.status === 'Active' ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button 
-                      className="action-btn-um" 
-                      title="Reset Password"
-                      onClick={() => handleResetPassword(user)}
-                    >
-                      Reset
-                    </button>
-                    <button 
-                      className="action-btn-um" 
-                      title="Manage Documents"
-                      onClick={() => handleManageDocuments(user)}
-                    >
-                      Docs
-                    </button>
-                    <button 
-                      className="action-btn-um" 
-                      title="Manage Notifications"
-                      onClick={() => handleManageNotifications(user)}
-                    >
-                      Notify
-                    </button>
-                    <button 
-                      className="action-btn-um" 
-                      title="Delete User"
-                      onClick={() => handleDeleteUser(user.id)}
-                    >
-                      Delete
-                    </button>
+                    {openMenuId === user.id && (
+                      <div className="action-menu-dropdown">
+                        <button 
+                          className="action-menu-item" 
+                          onClick={() => {
+                            handleViewDetails(user)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          <Eye size={16} />
+                          <span>View</span>
+                        </button>
+                        <button 
+                          className="action-menu-item" 
+                          onClick={() => {
+                            handleEditUser(user)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          <Pencil size={16} />
+                          <span>Edit</span>
+                        </button>
+                        <button 
+                          className="action-menu-item" 
+                          onClick={() => {
+                            handleToggleStatus(user.id, user.status)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          {user.status === 'Active' ? <PauseCircle size={16} /> : <PlayCircle size={16} />}
+                          <span>{user.status === 'Active' ? 'Deactivate' : 'Activate'}</span>
+                        </button>
+                        <button 
+                          className="action-menu-item" 
+                          onClick={() => {
+                            handleResetPassword(user)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          <Key size={16} />
+                          <span>Reset Password</span>
+                        </button>
+                        <button 
+                          className="action-menu-item" 
+                          onClick={() => {
+                            handleManageDocuments(user)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          <FileText size={16} />
+                          <span>Documents</span>
+                        </button>
+                        <button 
+                          className="action-menu-item" 
+                          onClick={() => {
+                            handleManageNotifications(user)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          <Bell size={16} />
+                          <span>Notifications</span>
+                        </button>
+                        <button 
+                          className="action-menu-item action-menu-item-danger" 
+                          onClick={() => {
+                            handleDeleteUser(user.id)
+                            setOpenMenuId(null)
+                          }}
+                        >
+                          <Trash2 size={16} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>

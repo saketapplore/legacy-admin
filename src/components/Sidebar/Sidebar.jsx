@@ -52,7 +52,6 @@ function Sidebar({ isOpen, onClose }) {
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       <div className="sidebar-header">
-        <h2 className="sidebar-logo">Legacy Admin</h2>
         <button className="close-sidebar-btn" onClick={onClose}>×</button>
       </div>
       
