@@ -1,7 +1,33 @@
+import { useState, useEffect } from 'react'
 import './Header.css'
-import { Menu, Search, Bell } from 'lucide-react'
+import { Menu, Search, Bell, LogOut } from 'lucide-react'
 
-function Header({ onMenuClick }) {
+function Header({ onMenuClick, onLogout }) {
+  const [adminUser, setAdminUser] = useState(null)
+
+  useEffect(() => {
+    const userStr = localStorage.getItem('adminUser')
+    if (userStr) {
+      try {
+        setAdminUser(JSON.parse(userStr))
+      } catch (err) {
+        console.error('Error parsing admin user:', err)
+      }
+    }
+  }, [])
+
+  const handleLogout = () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      if (onLogout) {
+        onLogout()
+      }
+    }
+  }
+
+  const userInitial = adminUser?.name?.charAt(0)?.toUpperCase() || 'A'
+  const userName = adminUser?.name || 'Admin'
+  const userEmail = adminUser?.email || 'admin@applore.in'
+
   return (
     <header className="header">
       <div className="header-content">
@@ -23,12 +49,16 @@ function Header({ onMenuClick }) {
           </button>
           
           <div className="user-profile">
-            <div className="user-avatar">A</div>
+            <div className="user-avatar">{userInitial}</div>
             <div className="user-info">
-              <span className="user-name">Admin</span>
-              <span className="user-role">Administrator</span>
+              <span className="user-name">{userName}</span>
+              <span className="user-role">{userEmail}</span>
             </div>
           </div>
+
+          <button className="logout-btn" onClick={handleLogout} title="Logout">
+            <LogOut size={18} />
+          </button>
         </div>
       </div>
     </header>

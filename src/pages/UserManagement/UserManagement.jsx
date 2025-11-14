@@ -39,6 +39,10 @@ function UserManagement() {
   // Form Validation States
   const [formErrors, setFormErrors] = useState({})
   
+  // Property Assignment State
+  const [selectedProjectId, setSelectedProjectId] = useState(null)
+  const [selectedPropertyId, setSelectedPropertyId] = useState(null)
+  
   // Search and Filter States
   const [searchQuery, setSearchQuery] = useState('')
   const [filterProject, setFilterProject] = useState('All Projects')
@@ -51,9 +55,10 @@ function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   
-  // Projects and Brokers State
+  // Projects, Brokers, and Properties State
   const [projects, setProjects] = useState([])
   const [brokers, setBrokers] = useState([])
+  const [properties, setProperties] = useState([])
   
   // Store uploaded documents with their file data
   const [userDocuments, setUserDocuments] = useState(() => {
@@ -61,7 +66,7 @@ function UserManagement() {
     return savedDocs ? JSON.parse(savedDocs) : {}
   })
 
-  // Fetch projects and brokers
+  // Fetch projects, brokers, and properties
   useEffect(() => {
     const fetchProjectsAndBrokers = async () => {
       try {
@@ -84,8 +89,22 @@ function UserManagement() {
         } else {
           console.error('Failed to load brokers:', brokersData.error)
         }
+
+        // Fetch properties
+        const propertiesResponse = await fetch(`${API_BASE_URL}/admin/properties`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}`
+          }
+        })
+        const propertiesData = await propertiesResponse.json()
+        if (propertiesData.success && propertiesData.data) {
+          setProperties(propertiesData.data.properties || [])
+          console.log('Properties loaded:', propertiesData.data.properties?.length || 0)
+        } else {
+          console.error('Failed to load properties:', propertiesData.error)
+        }
       } catch (err) {
-        console.error('Error fetching projects/brokers:', err)
+        console.error('Error fetching projects/brokers/properties:', err)
         // Note: showNotification is defined later, so we'll just log for now
         // The error will be visible in console
       }
@@ -171,6 +190,28 @@ function UserManagement() {
     }
   }, [openMenuId])
 
+  // Validate property belongs to selected project when project changes
+  useEffect(() => {
+    if (selectedProjectId && selectedPropertyId) {
+      const filteredProps = properties.filter(property => {
+        const propProjectId = property.projectId || property.project?._id || property.project?.id
+        const propIdStr = typeof propProjectId === 'object' && propProjectId?._id 
+          ? propProjectId._id.toString() 
+          : propProjectId?.toString()
+        const selectedIdStr = selectedProjectId.toString()
+        return propIdStr === selectedIdStr
+      })
+      const propertyExists = filteredProps.some(p => {
+        const propId = p.id || p._id
+        return propId?.toString() === selectedPropertyId?.toString()
+      })
+      if (!propertyExists) {
+        // Property doesn't belong to selected project, clear it
+        setSelectedPropertyId(null)
+      }
+    }
+  }, [selectedProjectId, selectedPropertyId, properties])
+
   // Filtered and Searched Users
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
@@ -206,12 +247,107 @@ function UserManagement() {
 
   const handleEditUser = (user) => {
     setSelectedUser(user)
+    // Set the project ID and property ID from user's existing property if available
+    if (user.projectId) {
+      setSelectedProjectId(user.projectId)
+    } else if (user.properties && user.properties.length > 0) {
+      const firstProperty = user.properties[0]
+      const projectId = firstProperty.projectId || firstProperty.project?._id || firstProperty.project?.id
+      if (projectId) {
+        setSelectedProjectId(projectId)
+      }
+      if (user.propertyId || firstProperty.id || firstProperty._id) {
+        setSelectedPropertyId(user.propertyId || firstProperty.id || firstProperty._id)
+      }
+    } else if (user.propertyId) {
+      setSelectedPropertyId(user.propertyId)
+    }
     setShowUserModal(true)
+  }
+  
+  // Get filtered properties based on selected project
+  const getFilteredProperties = () => {
+    if (!selectedProjectId) {
+      return []
+    }
+    return properties.filter(property => {
+      const propProjectId = property.projectId || property.project?._id || property.project?.id
+      // Handle both string and object IDs
+      const propIdStr = typeof propProjectId === 'object' && propProjectId?._id 
+        ? propProjectId._id.toString() 
+        : propProjectId?.toString()
+      const selectedIdStr = selectedProjectId.toString()
+      return propIdStr === selectedIdStr
+    })
   }
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type })
     setTimeout(() => setNotification(null), 3000)
+  }
+
+  const validateForm = (formData, isNewUser) => {
+    const errors = {}
+    
+    // Validate name
+    const name = formData.get('name')?.trim()
+    if (!name) {
+      errors.name = 'Full name is required'
+    } else if (name.length < 3) {
+      errors.name = 'Name must be at least 3 characters'
+    } else if (!/^[a-zA-Z\s]+$/.test(name)) {
+      errors.name = 'Name can only contain letters and spaces'
+    }
+    
+    // Validate email
+    const email = formData.get('email')?.trim()
+    if (!email) {
+      errors.email = 'Email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+    
+    // Validate phone
+    const phone = formData.get('phone')?.trim()
+    if (!phone) {
+      errors.phone = 'Phone number is required'
+    } else if (!/^[6-9][0-9]{9}$/.test(phone)) {
+      errors.phone = 'Please enter a valid 10-digit Indian mobile number starting with 6-9'
+    }
+    
+    // Validate project
+    const projectId = formData.get('projectId')
+    if (!projectId) {
+      errors.projectId = 'Please select a project'
+    }
+    
+    // Validate property
+    const propertyId = formData.get('propertyId')
+    if (!propertyId) {
+      errors.propertyId = 'Please select a property'
+    }
+    
+    // Validate password for new users
+    if (isNewUser) {
+      const password = formData.get('password')
+      const confirmPassword = formData.get('confirmPassword')
+      
+      if (!password) {
+        errors.password = 'Password is required'
+      } else if (password.length < 8) {
+        errors.password = 'Password must be at least 8 characters'
+      } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+        errors.password = 'Password must contain uppercase, lowercase, and a number'
+      }
+      
+      if (!confirmPassword) {
+        errors.confirmPassword = 'Please confirm your password'
+      } else if (password !== confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match'
+      }
+    }
+    
+    return errors
   }
 
   const handleSaveUser = async (e) => {
@@ -277,52 +413,138 @@ function UserManagement() {
       if (data.success) {
         userId = userId || data.data._id || data.data.id
         
-        // Assign user to property if project and property data provided
-        const projectId = formData.get('projectId')
-        const flatNo = formData.get('flatNo')
+        // Assign user to property if property is selected (for both new and existing users)
+        // Use state values directly since we're using controlled inputs
+        // Fallback to formData in case state isn't set (shouldn't happen but safety check)
+        const propertyId = selectedPropertyId || formData.get('propertyId') || ''
         const brokerId = formData.get('brokerId') || null
+        const projectId = selectedProjectId || formData.get('projectId') || ''
         
-        if (projectId && flatNo) {
-          const propertyData = {
-            flatNo: flatNo,
-            buildingName: formData.get('buildingName') || undefined,
-            location: formData.get('address') ? {
-              address: formData.get('address')
-            } : undefined,
-            specifications: {
-              area: formData.get('area') ? parseFloat(formData.get('area')) : undefined,
-              bedrooms: formData.get('bedrooms') ? parseInt(formData.get('bedrooms')) : undefined,
-              bathrooms: formData.get('bathrooms') ? parseInt(formData.get('bathrooms')) : undefined
-            },
-            pricing: {
-              totalPrice: formData.get('totalPrice') ? parseFloat(formData.get('totalPrice')) : undefined,
-              bookingAmount: formData.get('bookingAmount') ? parseFloat(formData.get('bookingAmount')) : undefined
-            }
-          }
+        // Debug logging (can be removed in production)
+        if (propertyId || projectId) {
+          console.log('Property Assignment Debug:', {
+            propertyId,
+            projectId,
+            brokerId,
+            selectedPropertyId,
+            selectedProjectId,
+            formDataPropertyId: formData.get('propertyId'),
+            formDataProjectId: formData.get('projectId'),
+            userId
+          })
+        }
+        
+        // Only proceed if we have both propertyId and projectId
+        if (propertyId && projectId && propertyId !== '' && projectId !== '') {
+          // Find the selected property to verify it exists
+          // Handle both string and object ID comparisons
+          const selectedProperty = properties.find(p => {
+            const propId = p.id || p._id
+            return propId?.toString() === propertyId?.toString()
+          })
+          
+          if (selectedProperty) {
+            try {
+              // Get the admin token - try multiple possible keys
+              const adminToken = localStorage.getItem('adminToken') || 
+                               localStorage.getItem('token') || 
+                               localStorage.getItem('authToken') || ''
+              
+              if (!adminToken) {
+                console.error('No admin token found in localStorage')
+                // Try to get token by logging in with a default admin account
+                // First, prompt user for admin credentials or try to login
+                const adminEmail = prompt('Admin authentication required.\n\nPlease enter admin email:')
+                const adminPassword = adminEmail ? prompt('Enter admin password:') : null
+                
+                if (adminEmail && adminPassword) {
+                  try {
+                    const loginResponse = await fetch(`${API_BASE_URL}/auth/login`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({
+                        email: adminEmail,
+                        password: adminPassword
+                      })
+                    })
+                    
+                    const loginData = await loginResponse.json()
+                    if (loginData.success && loginData.token) {
+                      // Check if user has admin role
+                      if (loginData.user && loginData.user.role === 'admin') {
+                        localStorage.setItem('adminToken', loginData.token)
+                        // Retry the assignment
+                        const retryAssignResponse = await fetch(`${API_BASE_URL}/users/${userId}/assign-property`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${loginData.token}`
+                          },
+                          body: JSON.stringify({
+                            propertyId: propertyId,
+                            projectId: projectId,
+                            brokerId: brokerId || undefined
+                          })
+                        })
+                        
+                        const retryAssignData = await retryAssignResponse.json()
+                        if (retryAssignData.success) {
+                          showNotification(`${selectedUser ? 'User updated' : 'User created'} and property assigned successfully`, 'success')
+                        } else {
+                          showNotification(`${selectedUser ? 'User updated' : 'User created'} but property assignment failed: ${retryAssignData.error}`, 'error')
+                        }
+                      } else {
+                        showNotification('Login successful but user does not have admin role. Please login with an admin account.', 'error')
+                      }
+                    } else {
+                      showNotification('Login failed. Please check your credentials.', 'error')
+                    }
+                  } catch (loginErr) {
+                    console.error('Login error:', loginErr)
+                    showNotification('Failed to authenticate. Please try again.', 'error')
+                  }
+                } else {
+                  showNotification(`${selectedUser ? 'User updated' : 'User created'} but property assignment failed: Authentication required. Please log in as admin.`, 'error')
+                }
+                return // Exit early since we handled the login attempt
+              } else {
+                const assignResponse = await fetch(`${API_BASE_URL}/users/${userId}/assign-property`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${adminToken}`
+                  },
+                  body: JSON.stringify({
+                    propertyId: propertyId,
+                    projectId: projectId,
+                    brokerId: brokerId || undefined
+                  })
+                })
 
-          try {
-            const assignResponse = await fetch(`${API_BASE_URL}/users/${userId}/assign-property`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${localStorage.getItem('adminToken') || ''}`
-              },
-              body: JSON.stringify({
-                projectId,
-                propertyData,
-                brokerId: brokerId || undefined
-              })
-            })
-
-            const assignData = await assignResponse.json()
-            if (!assignData.success) {
-              console.error('Failed to assign property:', assignData.error)
-              showNotification('User created but property assignment failed: ' + assignData.error, 'error')
+                const assignData = await assignResponse.json()
+                if (!assignData.success) {
+                  console.error('Failed to assign property:', assignData.error)
+                  // Check if it's an authentication error
+                  if (assignResponse.status === 401 || assignResponse.status === 403) {
+                    showNotification(`${selectedUser ? 'User updated' : 'User created'} but property assignment failed: Authentication error. Please log in as admin.`, 'error')
+                  } else {
+                    showNotification(`${selectedUser ? 'User updated' : 'User created'} but property assignment failed: ${assignData.error}`, 'error')
+                  }
+                } else {
+                  showNotification(`${selectedUser ? 'User updated' : 'User created'} and property assigned successfully`, 'success')
+                }
+              }
+            } catch (assignErr) {
+              console.error('Error assigning property:', assignErr)
+              showNotification(`${selectedUser ? 'User updated' : 'User created'} but property assignment failed: ${assignErr.message}`, 'error')
             }
-          } catch (assignErr) {
-            console.error('Error assigning property:', assignErr)
-            showNotification('User created but property assignment failed', 'error')
+          } else {
+            showNotification(`${selectedUser ? 'User updated' : 'User created'} but property assignment failed: Property not found`, 'error')
           }
+        } else {
+          showNotification(`${selectedUser ? 'User updated' : 'User created'} successfully`, 'success')
         }
         
         // Refresh users list
@@ -360,9 +582,12 @@ function UserManagement() {
           setUsers(mappedUsers)
         }
         
-        showNotification(selectedUser ? 'User updated successfully!' : 'User created successfully!', 'success')
+        // Close modal and reset form
         setShowUserModal(false)
         setSelectedUser(null)
+        setSelectedProjectId(null)
+        setSelectedPropertyId(null)
+        setFormErrors({})
       } else {
         showNotification(data.error || 'Failed to save user', 'error')
       }
@@ -635,7 +860,12 @@ This is a sample document for demonstration purposes.`
           <h1 className="page-title-main">User Management (Buyers)</h1>
           <p className="page-subtitle">Manage all buyer accounts and their details</p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setSelectedUser(null); setShowUserModal(true); }}>
+        <button className="btn btn-primary" onClick={() => { 
+          setSelectedUser(null)
+          setSelectedProjectId(null)
+          setSelectedPropertyId(null)
+          setShowUserModal(true)
+        }}>
           + Create New User
         </button>
       </div>
@@ -1161,11 +1391,21 @@ This is a sample document for demonstration purposes.`
 
       {/* Create/Edit User Modal */}
       {showUserModal && (
-        <div className="modal-overlay" onClick={() => setShowUserModal(false)}>
+        <div className="modal-overlay" onClick={() => {
+          setShowUserModal(false)
+          setSelectedProjectId(null)
+          setSelectedPropertyId(null)
+          setFormErrors({})
+        }}>
           <div className="modal-content modal-large" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{selectedUser ? 'Edit User' : 'Create New User'}</h2>
-              <button className="close-btn" onClick={() => { setShowUserModal(false); setFormErrors({}); }}>×</button>
+              <button className="close-btn" onClick={() => { 
+                setShowUserModal(false)
+                setFormErrors({})
+                setSelectedProjectId(null)
+                setSelectedPropertyId(null)
+              }}>×</button>
             </div>
             <div className="modal-body">
               <form className="user-form" onSubmit={handleSaveUser}>
@@ -1235,56 +1475,76 @@ This is a sample document for demonstration purposes.`
                     Property Assignment
                   </h3>
                   <p style={{ marginBottom: '20px', color: '#666', fontSize: '14px' }}>
-                    Assign this user to a property/project. This will allow them to view project details, documents, and payment schedules.
+                    First select a project, then choose a property from that project to assign to this user.
                   </p>
                   
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Assign Project *</label>
+                      <label>Select Project *</label>
                       <select 
                         name="projectId"
-                        defaultValue={selectedUser?.projectId || ''}
+                        value={selectedProjectId || ''}
+                        onChange={(e) => {
+                          setSelectedProjectId(e.target.value || null)
+                          // Clear property selection when project changes
+                          setSelectedPropertyId(null)
+                        }}
                         required
+                        className={formErrors.projectId ? 'error' : ''}
                       >
                         <option value="">Select Project</option>
                         {projects.length > 0 ? (
                           projects.map(project => (
                             <option key={project._id || project.id} value={project._id || project.id}>
-                              {project.name}
+                              {project.name} {project.location?.city ? ` - ${project.location.city}` : ''}
                             </option>
                           ))
                         ) : (
-                          <option value="" disabled>No projects available. Please create a project first.</option>
+                          <option value="" disabled>No projects available. Please create projects first.</option>
                         )}
                       </select>
-                      {projects.length === 0 && (
+                      {formErrors.projectId && <span className="error-message">{formErrors.projectId}</span>}
+                    </div>
+                    <div className="form-group">
+                      <label>Select Property *</label>
+                      <select 
+                        name="propertyId"
+                        value={selectedPropertyId || ''}
+                        onChange={(e) => setSelectedPropertyId(e.target.value || null)}
+                        required
+                        disabled={!selectedProjectId}
+                        className={formErrors.propertyId ? 'error' : ''}
+                      >
+                        <option value="">{selectedProjectId ? 'Select Property' : 'Select Project First'}</option>
+                        {selectedProjectId ? (
+                          (() => {
+                            const filteredProperties = getFilteredProperties()
+                            return filteredProperties.length > 0 ? (
+                              filteredProperties.map(property => (
+                                <option key={property.id || property._id} value={property.id || property._id}>
+                                  {property.flatNo} {property.buildingName ? `- ${property.buildingName}` : ''}
+                                  {property.specifications?.area ? ` - ${property.specifications.area} sqft` : ''}
+                                  {property.pricing?.totalPrice ? ` - ₹${property.pricing.totalPrice.toLocaleString('en-IN')}` : ''}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>No properties available for this project</option>
+                            )
+                          })()
+                        ) : (
+                          <option value="" disabled>Please select a project first</option>
+                        )}
+                      </select>
+                      {formErrors.propertyId && <span className="error-message">{formErrors.propertyId}</span>}
+                      {selectedProjectId && getFilteredProperties().length === 0 && !formErrors.propertyId && (
                         <small style={{ color: '#e74c3c', display: 'block', marginTop: '4px' }}>
-                          No projects found. Projects need to be created first.
+                          No properties found for this project. Please create properties in Property Management section first.
                         </small>
                       )}
                     </div>
-                    <div className="form-group">
-                      <label>Flat/Unit Number *</label>
-                      <input 
-                        type="text"
-                        name="flatNo" 
-                        placeholder="e.g., A-1203" 
-                        defaultValue={selectedUser?.flatNo}
-                        required 
-                      />
-                    </div>
                   </div>
-
+                  
                   <div className="form-row">
-                    <div className="form-group">
-                      <label>Building Name</label>
-                      <input 
-                        type="text"
-                        name="buildingName" 
-                        placeholder="e.g., Tower A" 
-                        defaultValue={selectedUser?.buildingName}
-                      />
-                    </div>
                     <div className="form-group">
                       <label>Assign Broker (Optional)</label>
                       <select 
@@ -1303,74 +1563,10 @@ This is a sample document for demonstration purposes.`
                         )}
                       </select>
                     </div>
-                  </div>
-
-                  <div className="form-row">
                     <div className="form-group">
-                      <label>Area (sqft)</label>
-                      <input 
-                        type="number"
-                        name="area" 
-                        placeholder="e.g., 1200" 
-                        defaultValue={selectedUser?.area}
-                        step="0.01"
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Total Price (INR)</label>
-                      <input 
-                        type="number"
-                        name="totalPrice" 
-                        placeholder="e.g., 5000000" 
-                        defaultValue={selectedUser?.totalPrice}
-                        step="0.01"
-                      />
+                      {/* Empty div to maintain grid layout */}
                     </div>
                   </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Bedrooms</label>
-                      <input 
-                        type="number"
-                        name="bedrooms" 
-                        placeholder="e.g., 2" 
-                        defaultValue={selectedUser?.bedrooms}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Bathrooms</label>
-                      <input 
-                        type="number"
-                        name="bathrooms" 
-                        placeholder="e.g., 2" 
-                        defaultValue={selectedUser?.bathrooms}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Booking Amount (INR)</label>
-                      <input 
-                        type="number"
-                        name="bookingAmount" 
-                        placeholder="e.g., 500000" 
-                        defaultValue={selectedUser?.bookingAmount}
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label>Address</label>
-                  <textarea 
-                    name="address"
-                    rows="3" 
-                    placeholder="Enter full address"
-                    defaultValue={selectedUser?.address || ''}
-                  ></textarea>
                 </div>
 
                 {!selectedUser && (
@@ -1406,7 +1602,13 @@ This is a sample document for demonstration purposes.`
                 )}
 
                 <div className="form-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => { setShowUserModal(false); setSelectedUser(null); setFormErrors({}); }}>Cancel</button>
+                  <button type="button" className="btn btn-outline" onClick={() => { 
+                    setShowUserModal(false)
+                    setSelectedUser(null)
+                    setSelectedProjectId(null)
+                    setSelectedPropertyId(null)
+                    setFormErrors({})
+                  }}>Cancel</button>
                   <button type="submit" className="btn btn-primary">
                     {selectedUser ? 'Update User' : 'Create User'}
                   </button>

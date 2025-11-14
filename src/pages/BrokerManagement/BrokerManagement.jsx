@@ -11,6 +11,7 @@ function BrokerManagement() {
   const [showDocumentsModal, setShowDocumentsModal] = useState(false)
   const [showNotificationsModal, setShowNotificationsModal] = useState(false)
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
+  const [openDropdownId, setOpenDropdownId] = useState(null)
 
   // Form Validation States
   const [formErrors, setFormErrors] = useState({})
@@ -50,6 +51,23 @@ function BrokerManagement() {
     const savedSuppliers = localStorage.getItem('legacy-admin-suppliers')
     return savedSuppliers ? JSON.parse(savedSuppliers) : []
   })
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (openDropdownId && !event.target.closest('.menu-button-container')) {
+        setOpenDropdownId(null)
+      }
+    }
+
+    if (openDropdownId) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdownId])
 
   // Listen for changes in User Management and update available buyers
   useEffect(() => {
@@ -802,63 +820,96 @@ Date: ${new Date().toLocaleString()}`
                   </span>
                 </td>
                 <td>
-                  <div className="action-buttons-bm">
+                  <div className="menu-button-container">
                     <button 
-                      className="action-btn-bm" 
-                      title="View Details"
-                      onClick={() => handleViewDetails(broker)}
+                      className="menu-button-bm" 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenDropdownId(openDropdownId === broker.id ? null : broker.id)
+                      }}
                     >
-                      👁️
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="4" cy="8" r="1.5" fill="currentColor"/>
+                        <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+                        <circle cx="12" cy="8" r="1.5" fill="currentColor"/>
+                      </svg>
                     </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Edit Broker"
-                      onClick={() => handleEditBroker(broker)}
-                    >
-                      ✏️
-                    </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Assign Buyers/Suppliers"
-                      onClick={() => handleManageAssignments(broker)}
-                    >
-                      👥
-                    </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Toggle Status"
-                      onClick={() => handleToggleStatus(broker.id, broker.status)}
-                    >
-                      {broker.status === 'Active' ? '⏸️' : '▶️'}
-                    </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Manage Documents"
-                      onClick={() => handleManageDocuments(broker)}
-                    >
-                      📄
-                    </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Send Notification"
-                      onClick={() => handleManageNotifications(broker)}
-                    >
-                      🔔
-                    </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Reset Password"
-                      onClick={() => handleResetPassword(broker)}
-                    >
-                      🔑
-                    </button>
-                    <button 
-                      className="action-btn-bm" 
-                      title="Delete Broker"
-                      onClick={() => handleDeleteBroker(broker.id)}
-                    >
-                      🗑️
-                    </button>
+                    {openDropdownId === broker.id && (
+                      <div className="menu-dropdown">
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleViewDetails(broker)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          View Details
+                        </button>
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleEditBroker(broker)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          Edit Broker
+                        </button>
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleManageAssignments(broker)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          Assign Buyers/Suppliers
+                        </button>
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleToggleStatus(broker.id, broker.status)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          {broker.status === 'Active' ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleManageDocuments(broker)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          Manage Documents
+                        </button>
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleManageNotifications(broker)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          Send Notification
+                        </button>
+                        <button 
+                          className="menu-dropdown-item"
+                          onClick={() => {
+                            handleResetPassword(broker)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          Reset Password
+                        </button>
+                        <button 
+                          className="menu-dropdown-item menu-dropdown-item-danger"
+                          onClick={() => {
+                            handleDeleteBroker(broker.id)
+                            setOpenDropdownId(null)
+                          }}
+                        >
+                          Delete Broker
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </td>
               </tr>
